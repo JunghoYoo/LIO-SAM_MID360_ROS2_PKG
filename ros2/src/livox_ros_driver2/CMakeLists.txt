@@ -282,35 +282,58 @@ else(ROS_EDITION STREQUAL "ROS2")
   target_include_directories(${PROJECT_NAME} PRIVATE ${livox_sdk_INCLUDE_DIRS})
 
   # get include directories of custom msg headers
-  if(HUMBLE_ROS STREQUAL "humble")
+  # Use modern typesupport approach for Humble, Jazzy, and newer distributions
+  if(HUMBLE_ROS STREQUAL "humble" OR "$ENV{ROS_DISTRO}" STREQUAL "jazzy" OR "$ENV{ROS_DISTRO}" STREQUAL "iron" OR NOT DEFINED HUMBLE_ROS OR HUMBLE_ROS STREQUAL "")
     rosidl_get_typesupport_target(cpp_typesupport_target
     ${LIVOX_INTERFACES} "rosidl_typesupport_cpp")
     target_link_libraries(${PROJECT_NAME} "${cpp_typesupport_target}")
+    set(USE_MODERN_TYPESUPPORT TRUE)
   else()
     set(LIVOX_INTERFACE_TARGET "${LIVOX_INTERFACES}__rosidl_typesupport_cpp")
     add_dependencies(${PROJECT_NAME} ${LIVOX_INTERFACES})
     get_target_property(LIVOX_INTERFACES_INCLUDE_DIRECTORIES ${LIVOX_INTERFACE_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
+    set(USE_MODERN_TYPESUPPORT FALSE)
   endif()
 
   # include file direcotry
-  target_include_directories(${PROJECT_NAME} PUBLIC
-    ${PCL_INCLUDE_DIRS}
-    ${APR_INCLUDE_DIRS}
-    ${LIVOX_LIDAR_SDK_INCLUDE_DIR}
-    ${LIVOX_INTERFACES_INCLUDE_DIRECTORIES}   # for custom msgs
-    3rdparty
-    src
-  )
+  if(USE_MODERN_TYPESUPPORT)
+    target_include_directories(${PROJECT_NAME} PUBLIC
+      ${PCL_INCLUDE_DIRS}
+      ${APR_INCLUDE_DIRS}
+      ${LIVOX_LIDAR_SDK_INCLUDE_DIR}
+      3rdparty
+      src
+    )
+  else()
+    target_include_directories(${PROJECT_NAME} PUBLIC
+      ${PCL_INCLUDE_DIRS}
+      ${APR_INCLUDE_DIRS}
+      ${LIVOX_LIDAR_SDK_INCLUDE_DIR}
+      ${LIVOX_INTERFACES_INCLUDE_DIRECTORIES}   # for custom msgs
+      3rdparty
+      src
+    )
+  endif()
 
   # link libraries
-  target_link_libraries(${PROJECT_NAME}
-    ${LIVOX_LIDAR_SDK_LIBRARY}
-    ${LIVOX_INTERFACE_TARGET}   # for custom msgs
-    ${PPT_LIBRARY}
-    ${Boost_LIBRARY}
-    ${PCL_LIBRARIES}
-    ${APR_LIBRARIES}
-  )
+  if(USE_MODERN_TYPESUPPORT)
+    target_link_libraries(${PROJECT_NAME}
+      ${LIVOX_LIDAR_SDK_LIBRARY}
+      ${PPT_LIBRARY}
+      ${Boost_LIBRARY}
+      ${PCL_LIBRARIES}
+      ${APR_LIBRARIES}
+    )
+  else()
+    target_link_libraries(${PROJECT_NAME}
+      ${LIVOX_LIDAR_SDK_LIBRARY}
+      ${LIVOX_INTERFACE_TARGET}   # for custom msgs
+      ${PPT_LIBRARY}
+      ${Boost_LIBRARY}
+      ${PCL_LIBRARIES}
+      ${APR_LIBRARIES}
+    )
+  endif()
 
   rclcpp_components_register_node(${PROJECT_NAME}
     PLUGIN "livox_ros::DriverNode"
